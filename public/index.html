@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <link rel="shortcut icon" href="https://cdn.glitch.global/debf12f7-ee95-46db-8559-346363437113/%E7%84%A1%E6%96%99%E3%83%90%E3%83%8A%E3%83%8A%E3%82%A2%E3%82%A4%E3%82%B3%E3%83%B3.png?v=1749218415446">
+  <title>ばななchat</title>
+  <style>
+    :root {
+      --bg-light: #ffffff;
+      --text-light: #000000;
+      --bg-dark: #1e1e1e;
+      --text-dark: #f0f0f0;
+      --input-bg-dark: #333333;
+      --border-dark: #555555;
+    }
+
+    body {
+      font-family: sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: var(--bg-light);
+      color: var(--text-light);
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    body.dark {
+      background-color: var(--bg-dark);
+      color: var(--text-dark);
+    }
+
+    body.dark button,
+    body.dark input,
+    body.dark textarea,
+    body.dark #messages {
+      background-color: var(--input-bg-dark);
+      color: var(--text-dark);
+      border-color: var(--border-dark);
+    }
+
+    .container {
+      max-width: 800px;
+      margin: auto;
+      padding: 20px;
+    }
+
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    button {
+      padding: 10px;
+      margin: 5px;
+      cursor: pointer;
+    }
+
+    input, textarea {
+      padding: 10px;
+      margin: 5px 0;
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    #messages {
+      border: 1px solid #ccc;
+      padding: 10px;
+      height: 300px;
+      overflow-y: auto;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="top-bar">
+      <h1>グループチャット</h1>
+      <button onclick="toggleTheme()">🌙 / ☀️</button>
+    </div>
+
+    <div id="nameInput" style="display:none">
+      <input type="text" id="username" placeholder="あなたの名前を入力してください" />
+      <button onclick="saveName()">保存</button>
+    </div>
+
+    <div>
+      <button onclick="createGroup()">グループチャットを作成</button>
+      <input type="text" id="groupCodeInput" placeholder="コードを入力して参加" />
+      <button onclick="joinGroup()">参加</button>
+    </div>
+
+    <div id="chatSection" style="display:none">
+      <h3>グループ: <span id="currentGroup"></span></h3>
+      <div id="messages"></div>
+      <textarea id="messageInput" placeholder="メッセージを入力"></textarea>
+      <button onclick="sendMessage()">送信</button>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+    const messagesDiv = document.getElementById('messages');
+    const chatSection = document.getElementById('chatSection');
+    const nameInput = document.getElementById('nameInput');
+    const currentGroupSpan = document.getElementById('currentGroup');
+
+    let username = localStorage.getItem('username');
+    let groupCode = localStorage.getItem('groupCode');
+
+    if (!username) {
+      nameInput.style.display = 'block';
+    } else if (groupCode) {
+      joinGroup(groupCode);
+    }
+
+    function saveName() {
+      username = document.getElementById('username').value;
+      if (username) {
+        localStorage.setItem('username', username);
+        nameInput.style.display = 'none';
+      }
+    }
+
+    function createGroup() {
+      const code = Math.random().toString(36).substr(2, 6);
+      alert(`グループコード: ${code}`);
+      joinGroup(code);
+    }
+
+    function joinGroup(codeInput) {
+      groupCode = codeInput || document.getElementById('groupCodeInput').value;
+      if (!groupCode) return alert('コードを入力してください');
+
+      localStorage.setItem('groupCode', groupCode);
+      chatSection.style.display = 'block';
+      currentGroupSpan.textContent = groupCode;
+
+      socket.emit('join', groupCode);
+    }
+
+    function sendMessage() {
+      const text = document.getElementById('messageInput').value;
+      if (!text) return;
+
+      const message = { name: username, text, group: groupCode };
+      socket.emit('message', message);
+      document.getElementById('messageInput').value = '';
+    }
+
+    socket.on('message', msg => {
+      const p = document.createElement('p');
+      p.innerHTML = `<strong>${msg.name}:</strong> ${msg.text}`;
+      messagesDiv.appendChild(p);
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+
+      if (msg.name !== username) {
+        notify(`${msg.name}: ${msg.text}`);
+      }
+    });
+
+    function notify(text) {
+      if (Notification.permission === 'granted') {
+        new Notification('新しいメッセージ', { body: text });
+      }
+    }
+
+    if ("Notification" in window && Notification.permission !== "granted") {
+      Notification.requestPermission();
+    }
+
+    function toggleTheme() {
+      document.body.classList.toggle('dark');
+    }
+  </script>
+</body>
+</html>
